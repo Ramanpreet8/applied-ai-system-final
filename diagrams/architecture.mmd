@@ -1,0 +1,16 @@
+flowchart TD
+    U[/"User: plain-English request"/] --> G1{"Input guardrail<br/>validate_request"}
+    G1 -- "empty / non-text / too long / symbols" --> B["Blocked with friendly message"]
+    G1 -- "valid request" --> P["1. PLAN<br/>plan(): words to profile<br/>genre, mood, energy, decade, clean?"]
+    CSV[("data/songs.csv<br/>18 songs")] --> L["load_songs()"]
+    L --> F["Filter explicit songs when requested"]
+    P --> F
+    F --> A["2. ACT<br/>recommend_songs()<br/>score_song + diversity penalty"]
+    A --> V{"3. VERIFY<br/>confidence() and check_output()"}
+    V -- "confidence below 0.50 or problems" --> R["4. REVISE<br/>try next strategy:<br/>genre_first, mood_first, energy_focused"]
+    R --> A
+    V -- "passes or best of 3" --> O["Ranked songs + confidence + warnings"]
+    O --> LOG[("logs/agent_trace.log<br/>reasoning trace")]
+    O --> H["Human reviews output<br/>(human-in-the-loop)"]
+    T["Test harness<br/>evals/run_eval.py + pytest"] -. "sends predefined requests" .-> G1
+    O -. "checks expected results" .-> T

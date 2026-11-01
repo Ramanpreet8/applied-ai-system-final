@@ -1,75 +1,80 @@
-# 🎵 Music Recommender Simulation
+# VibeFinder 2.0
 
-## Project Summary
+## Title and Summary
 
-In this project you will build and explain a small music recommender system.
+VibeFinder turns a plain-English music request into a ranked list from a small song catalog. Its rule-based agent plans a taste profile, tries recommendation strategies, checks confidence and output guardrails, and revises when results are weak. It also explains its steps through a trace log and flags requests it does not understand well. This project shows how transparent rules can help while also exposing the limits of small datasets and heuristic confidence.
 
-Your goal is to:
+## Base Project
 
-- Represent songs and a user "taste profile" as data
-- Design a scoring rule that turns that data into recommendations
-- Evaluate what your system gets right and wrong
-- Reflect on how this mirrors real world AI recommenders
+The base project is **Music Recommender Simulation (Module 3)**. It scored 18 songs against a hand-written taste profile using genre, mood, energy, and extra musical features, and explained each score. It includes three scoring modes and a diversity penalty to reduce repeated artists and genres.
 
-Replace this paragraph with your own summary of what your version does.
+## What Is New
 
----
+- A plan/act/verify/revise agent loop with three scoring strategies.
+- Input and output guardrails, including request-length limits and clean-music filtering.
+- A confidence heuristic that combines score fit with how much of the request was recognized.
+- Reasoning traces printed by the CLI and saved in `logs/agent_trace.log`.
+- A ten-case evaluation harness and expanded pytest coverage.
 
-## How The System Works
+## Architecture Overview
 
-Real music platforms often combine collaborative filtering, which learns from listening patterns, likes, skips, and playlists from similar users, with content-based filtering, which compares a listener's preferences with song attributes. This project prioritizes a simple, explainable content-based approach: each `Song` also records popularity, release decade, detailed mood tags, explicit status, and instrumentalness, while each `UserProfile` can set targets for these features. The recommender scores genre, mood, energy, and these added attributes, then ranks songs by total score.
+![VibeFinder architecture](assets/architecture.png)
 
-### Algorithm Recipe
+```mermaid
+flowchart TD
+    U[/"User: plain-English request"/] --> G1{"Input guardrail<br/>validate_request"}
+    G1 -- "empty / non-text / too long / symbols" --> B["Blocked with friendly message"]
+    G1 -- "valid request" --> P["1. PLAN<br/>plan(): words to profile<br/>genre, mood, energy, decade, clean?"]
+    CSV[("data/songs.csv<br/>18 songs")] --> L["load_songs()"]
+    L --> F["Filter explicit songs when requested"]
+    P --> F
+    F --> A["2. ACT<br/>recommend_songs()<br/>score_song + diversity penalty"]
+    A --> V{"3. VERIFY<br/>confidence() and check_output()"}
+    V -- "confidence below 0.50 or problems" --> R["4. REVISE<br/>try next strategy:<br/>genre_first, mood_first, energy_focused"]
+    R --> A
+    V -- "passes or best of 3" --> O["Ranked songs + confidence + warnings"]
+    O --> LOG[("logs/agent_trace.log<br/>reasoning trace")]
+    O --> H["Human reviews output<br/>(human-in-the-loop)"]
+    T["Test harness<br/>evals/run_eval.py + pytest"] -. "sends predefined requests" .-> G1
+    O -. "checks expected results" .-> T
+```
 
-Choose `genre_first`, `mood_first`, or `energy_focused` with `python -m src.main --mode <mode>`; the default `all` compares each mode. The modes weight genre, mood, and energy similarity as `(3, 1, 1)`, `(1, 3, 1)`, and `(0.5, 0.5, 3)`. Add up to 0.5 popularity points using `0.5 * (1 - abs(song.popularity - target_popularity) / 100)`, 0.5 for an exact release-decade match, 0.5 per overlapping mood tag up to 1.0, and up to 0.3 for instrumentalness closeness using `0.3 * (1 - abs(song.instrumentalness - target_instrumentalness))`. Recommendations are selected greedily: each repeat artist loses 1 point and each repeat genre loses 0.5, based on songs already chosen. Set `diversity=False` in `recommend_songs` to compare the unadjusted ranking. These weights and penalties can favor particular features, while the small catalog and manually assigned labels limit variety and accuracy.
+The CLI loads the CSV catalog and validates a user's request before planning begins.
+The planner maps recognized words to genre, mood, energy, decade, and content preferences.
+The agent filters explicit songs when requested, then scores and diversifies recommendations.
+Verification checks confidence and result problems; revision tries the remaining scoring modes.
+The best passing result—or best of three—is returned with warnings and a trace.
+The trace is logged, and a person remains responsible for reviewing recommendations.
 
----
+The Mermaid source is [architecture.mmd](diagrams/architecture.mmd).
 
-## Getting Started
+## Setup Instructions
 
-### Setup
-
-1. Create a virtual environment (optional but recommended):
-
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate      # Mac or Linux
-   .venv\Scripts\activate         # Windows
-
-2. Install dependencies
+From the project root:
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-3. Run the app:
+Run the original recommender, the natural-language CLI, the unit tests, or the evaluation harness:
 
 ```bash
 python -m src.main
-```
-
-### Running Tests
-
-Run the starter tests with:
-
-```bash
-pytest
-```
-
-You can add more tests in `tests/test_recommender.py`.
-
----
-
-### Running the VibeFinder Agent
-
-The agent CLI accepts a natural-language request, prints recommendations and its
-plan/act/verify/revise trace, and writes the trace to `logs/agent_trace.log`.
-
-```bash
 python -m src.agent_cli "I need chill music to study at night"
+python -m pytest -q
+python -m evals.run_eval
 ```
+
+The agent CLI accepts a request as its command-line arguments and writes successful-run trace lines to `logs/agent_trace.log`.
+
+## Sample Interactions
+
+### Study request
 
 ```text
+$ python -m src.agent_cli "I need chill music to study at night"
 Request: I need chill music to study at night
 Strategy used: mood_first | Confidence: 0.51
 | Rank   | Title              | Artist         | Score   |
@@ -89,11 +94,10 @@ Agent trace:
  VERIFY attempt 2 accepted (confidence >= 0.5)
 ```
 
-```bash
-python -m src.agent_cli "clean pop party music"
-```
+### Clean pop request
 
 ```text
+$ python -m src.agent_cli "clean pop party music"
 Request: clean pop party music
 Strategy used: genre_first | Confidence: 0.56
 | Rank   | Title           | Artist            | Score   |
@@ -112,11 +116,10 @@ Agent trace:
  VERIFY attempt 1 accepted (confidence >= 0.5)
 ```
 
-```bash
-python -m src.agent_cli "polka"
-```
+### Unknown request
 
 ```text
+$ python -m src.agent_cli "polka"
 Request: polka
 Strategy used: energy_focused | Confidence: 0.29
 | Rank   | Title             | Artist       | Score   |
@@ -141,85 +144,57 @@ Agent trace:
  VERIFY no attempt passed; using best (mode=energy_focused, confidence=0.29)
 ```
 
-An empty request is rejected (the command exits with status 1):
+## Reliability and Guardrails
 
-```bash
-python -m src.agent_cli ""
-```
+The input guardrail rejects non-text, blank, symbol-only, and over-300-character requests, as well as `k` outside 1–10. The output guardrail reports an empty or short recommendation list and artist dominance. A clean-music request excludes songs marked explicit; this is a catalog filter, not a general content-safety system.
+
+An empty request is blocked before planning:
 
 ```text
+$ python -m src.agent_cli ""
 Guardrail blocked this request: Request is empty. Try: 'chill lofi music to study'.
+Exit status: 1
 ```
 
-## Sample Recommendation Output
+Evaluation harness output from `python -m evals.run_eval`:
 
 ```text
-Loaded songs: 18
+| Test                                    | Detail                         | Result   |
+|-----------------------------------------|--------------------------------|----------|
+| Pop workout -> a pop song first         | conf=0.56, mode=genre_first    | PASS     |
+| Study request -> a lofi song first      | conf=0.88, mode=genre_first    | PASS     |
+| Rock request -> a rock song first       | conf=0.92, mode=genre_first    | PASS     |
+| Clean request -> zero explicit songs    | conf=0.56, mode=genre_first    | PASS     |
+| Unknown mood 'sad' -> warns the user    | conf=0.52, mode=genre_first    | PASS     |
+| Gibberish -> low confidence + warning   | conf=0.29, mode=energy_focused | PASS     |
+| Vague request -> agent revises strategy | conf=0.51, mode=mood_first     | PASS     |
+| Empty input -> blocked by guardrail     | blocked                        | PASS     |
+| Symbols only -> blocked by guardrail    | blocked                        | PASS     |
+| Very long input -> blocked by guardrail | blocked                        | PASS     |
 
-High-Energy Pop - Mode: genre_first
-+--------+----------------+-------------------+---------+------------------------------------------------------+
-|   Rank | Title          | Artist            |   Score | Reasons                                              |
-+========+================+===================+=========+======================================================+
-|      1 | Sunrise City   | Neon Echo         |    7.13 | genre match (+3.0); mood match (+1.0); energy        |
-|        |                |                   |         | similarity (+0.87); popularity close (+0.48);        |
-|        |                |                   |         | release decade match (+0.50); mood tags overlap      |
-|        |                |                   |         | (+1.00); instrumentalness close (+0.28)              |
-+--------+----------------+-------------------+---------+------------------------------------------------------+
-|      2 | Gym Hero       | Max Pulse         |    4.73 | genre match (+3.0); energy similarity (+0.98);       |
-|        |                |                   |         | popularity close (+0.48); release decade match       |
-|        |                |                   |         | (+0.50); mood tags overlap (+0.00); instrumentalness |
-|        |                |                   |         | close (+0.27); diversity penalty: genre already      |
-|        |                |                   |         | recommended (-0.5)                                   |
-+--------+----------------+-------------------+---------+------------------------------------------------------+
-|      3 | Rooftop Lights | Indigo Parade     |    3.56 | mood match (+1.0); energy similarity (+0.81);        |
-|        |                |                   |         | popularity close (+0.46); release decade match       |
-|        |                |                   |         | (+0.50); mood tags overlap (+0.50); instrumentalness |
-|        |                |                   |         | close (+0.28)                                        |
-+--------+----------------+-------------------+---------+------------------------------------------------------+
-|      4 | Neon Parade    | The Brass Circuit |    2.57 | energy similarity (+0.86); popularity close (+0.43); |
-|        |                |                   |         | release decade match (+0.50); mood tags overlap      |
-|        |                |                   |         | (+0.50); instrumentalness close (+0.28)              |
-+--------+----------------+-------------------+---------+------------------------------------------------------+
-|      5 | Iron Horizon   | Black Anvil       |    2.18 | energy similarity (+0.99); popularity close (+0.42); |
-|        |                |                   |         | release decade match (+0.50); mood tags overlap      |
-|        |                |                   |         | (+0.00); instrumentalness close (+0.27)              |
-+--------+----------------+-------------------+---------+------------------------------------------------------+
+10/10 checks passed; average confidence on answered requests = 0.61
+```
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or demo video link here -->
+## Design Decisions
 
----
+### Algorithm Recipe
 
-## Experiments You Tried
+The recommender offers three strategies: `genre_first` weights genre/mood/energy at 3/1/1; `mood_first` at 1/3/1; and `energy_focused` at 0.5/0.5/3. It adds up to 0.5 for popularity closeness, 0.5 for an exact release-decade match, up to 1.0 for overlapping mood tags, and up to 0.3 for instrumentalness closeness. Greedy diversity selection applies a 1-point repeat-artist and 0.5-point repeat-genre penalty for each previously selected match.
 
-Use this section to document the experiments you ran. For example:
+### Agent and confidence
 
-- What happened when you changed the weight on genre from 2.0 to 0.5
-- What happened when you added tempo or valence to the score
-- How did your system behave for different types of users
+The planner is rule-based and deliberately inspectable: a small keyword map turns requests into the feature values the scorer already understands. Confidence is the top recommendation's score divided by the best possible score, capped at 1, multiplied by an understanding factor based on recognized catalog genre and mood. The denominator counts genre and mood even when omitted, preventing vague requests from appearing confident merely because those categories were ignored.
 
----
+The 0.50 threshold is a practical revision trigger, not a statistically calibrated boundary. The agent tries each scoring mode until confidence meets the threshold and output checks pass; otherwise it returns the best of three with a warning. A low threshold can stop too early, while a high threshold causes repeated revisions and can issue warnings even when results are usable. The system favors explainability and a human-readable trace over broad language understanding or learned personalization.
 
-## Limitations and Risks
+## Testing Summary
 
-Summarize some limitations of your recommender.
-
-Examples:
-
-- It only works on a tiny catalog
-- It does not understand lyrics or language
-- It might over favor one genre or mood
-
-You will go deeper on this in your model card.
-
----
+All **29 pytest tests** pass. The evaluation harness passes **10/10 checks**, with **0.61 average confidence** on answered requests. The weakest case is an unrecognized, genre-free request such as “polka”: it receives a low-confidence warning and still gets a best-effort list. The four controlled reliability experiments and their observed outcomes are recorded in [model_card.md](model_card.md).
 
 ## Reflection
 
-Read and complete `model_card.md`:
+The project made it clear that a precise-looking confidence number is only as trustworthy as its assumptions. The traces and controlled experiments helped distinguish “the scorer found a strong match” from “the planner understood what was asked.” The detailed reflection and limitations are in the [model card](model_card.md).
 
-[**Model Card**](model_card.md)
+## Loom link (optional)
 
-Write 1 to 2 paragraphs here about what you learned:
-
-- about how recommenders turn data into predictions
-- about where bias or unfairness could show up in systems like this
+<!-- Add a project demo link here if one is recorded. -->

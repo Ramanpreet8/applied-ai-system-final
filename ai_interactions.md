@@ -258,3 +258,48 @@ Exit status: 1
 ### Manual verification notes
 
 Ran all four commands against `data/songs.csv`. The chill request revised from `genre_first` to `mood_first` and was accepted at 0.51 confidence. The clean request removed three explicit songs before recommending. The unrecognized `polka` request tried all three strategies and displayed low-confidence warnings. The empty request was blocked and exited with status 1. Confirmed the valid runs were written to `logs/agent_trace.log`; the blocked empty request was rejected before an agent trace could be logged.
+
+---
+
+## Final Project: Agent Reasoning Traces
+
+These are the actual trace lines from `run_agent` using the current 18-song catalog.
+
+### Study request: revise to a strategy that passes
+
+```text
+INPUT guardrail passed: 'I need chill music to study at night'
+PLAN profile = {'genre': None, 'mood': 'chill', 'energy': 0.3, 'target_popularity': 60, 'preferred_decade': 2020, 'preferred_mood_tags': ['chill'], 'target_instrumentalness': 0.3, 'exclude_explicit': False}
+ACT attempt 1 mode=genre_first: top='Midnight Coding' confidence=0.31 problems=none
+REVISE confidence 0.31 too low or problems found -> trying next strategy
+ACT attempt 2 mode=mood_first: top='Midnight Coding' confidence=0.51 problems=none
+VERIFY attempt 2 accepted (confidence >= 0.5)
+```
+
+### Clean request: filter the catalog before scoring
+
+```text
+INPUT guardrail passed: 'clean pop party music'
+PLAN profile = {'genre': 'pop', 'mood': None, 'energy': 0.9, 'target_popularity': 60, 'preferred_decade': 2020, 'preferred_mood_tags': [], 'target_instrumentalness': 0.3, 'exclude_explicit': True}
+GUARD clean-music request: removed 3 explicit songs
+ACT attempt 1 mode=genre_first: top='Gym Hero' confidence=0.56 problems=none
+VERIFY attempt 1 accepted (confidence >= 0.5)
+```
+
+### Unrecognized request: try all strategies and report low confidence
+
+```text
+INPUT guardrail passed: 'polka'
+PLAN profile = {'genre': None, 'mood': None, 'energy': 0.5, 'target_popularity': 60, 'preferred_decade': 2020, 'preferred_mood_tags': [], 'target_instrumentalness': 0.3, 'exclude_explicit': False}
+ACT attempt 1 mode=genre_first: top='Midnight Coding' confidence=0.13 problems=none
+REVISE confidence 0.13 too low or problems found -> trying next strategy
+ACT attempt 2 mode=mood_first: top='Midnight Coding' confidence=0.13 problems=none
+REVISE confidence 0.13 too low or problems found -> trying next strategy
+ACT attempt 3 mode=energy_focused: top='Midnight Coding' confidence=0.29 problems=none
+REVISE confidence 0.29 too low or problems found -> trying next strategy
+VERIFY no attempt passed; using best (mode=energy_focused, confidence=0.29)
+```
+
+### What I checked by hand
+
+I confirmed the study request's first strategy is below the 0.50 threshold and its second strategy passes. For the clean request, I checked that the trace says three explicit songs were removed and that none of the returned songs is explicit. For “polka,” I confirmed no genre or mood was recognized, all three strategies ran, and the final low-confidence warning agrees with the 0.29 result. I also ran the four controlled reliability experiments and recorded the measured outcomes in Sections 9–12 of `model_card.md`.

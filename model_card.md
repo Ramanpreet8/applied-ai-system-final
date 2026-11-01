@@ -115,3 +115,27 @@ Add more songs and more balanced examples for each genre and mood. Use tempo, va
 ## 8. Personal Reflection
 
 My biggest learning moment was seeing how every scoring weight and feature changes the order of the recommendations, without proving they are more accurate. I double-checked the AI's work by adding Sunrise City's listed points by hand and caught a loader bug when instrumentalness was treated as text instead of a number. I was surprised that the expanded features moved Quiet Constellations above Storm Runner for the low-energy rock profile. Next, I would add more songs and test recommendations with real listener feedback.
+
+## 9. Limitations and Biases of the Agent
+
+The planner is a fixed English keyword matcher, not a general language model. It only recognizes the words and phrases listed in `MOOD_WORDS` and the energy/content keyword lists; genre matching requires the catalog label to appear exactly in the request. The catalog has only 18 hand-labeled songs and no listener feedback, so most genres and moods have very few examples. The word “sad” is recognized, but no song in the catalog has the `sad` mood, so the agent warns and falls back on other features. Confidence is a heuristic based on score ratio and recognized genre/mood, not a calibrated probability that a recommendation is relevant.
+
+## 10. Misuse and Prevention
+
+A user could provide misleading or irrelevant words and cause the keyword planner to build a profile that does not reflect their intent. Repeated requests could also consume resources; the 300-character input limit and `k` limit bound individual requests, but this prototype has no rate limiting. The clean-music option filters songs whose catalog `explicit` field is set, and the trace log records the request and agent decisions; log files should therefore be handled as user data. These guardrails reduce some predictable errors but do not make this a safety service. The system should not profile people, infer sensitive traits, or be presented as a real music service. A human should review recommendations before relying on them.
+
+## 11. What Surprised Me in Reliability Testing
+
+The “polka” experiments showed how a plausible confidence value can be produced for a request the planner did not understand. With the current implementation, “polka” receives confidence 0.29, tries all three modes, and is flagged as low confidence. In an isolated runtime experiment, counting genre and mood in the maximum score only when they were mentioned raised the result to 0.36 while retaining the understanding multiplier. Removing that multiplier too, while using the conditional denominator, raised confidence to 0.89 and caused the first strategy to be accepted despite the unrecognized request. This combined experiment confirms why the current implementation counts every category and includes an understanding factor.
+
+With the full maximum-score denominator but without the understanding multiplier, “polka” reached 0.73 and was accepted using `energy_focused`. The genre/mood weight changes therefore let the revision loop increase its numeric confidence without increasing what the planner knew. Removing input validation in an isolated runtime run also demonstrated the guardrail's value: an empty request returned five recommendations instead of being rejected.
+
+The threshold experiment showed that passing functional checks does not prove a good interaction. At a 0.30 threshold, the vague study request stopped after its first strategy at 0.31, so the harness's revise expectation failed and the overall score was 9/10. At 0.80, all 10 checks passed because the harness checks recommendation behavior, not whether the agent accepted without a low-confidence warning; the agent tried all strategies and returned the best available result.
+
+## 12. AI Collaboration
+
+I used AI assistance to implement the agent loop, CLI, guardrails, evaluation harness, tests, and documentation. I accepted the suggestion to handle empty recommendation lists safely and add edge-case tests, because directly indexing the first result would fail for an empty catalog. I also checked the experiment claims rather than copying the guide's illustrative confidence unchanged: the denominator change alone produced 0.36 in this code, while 0.89 required removing the understanding multiplier as well. The final docs distinguish those two changes and keep the working agent's measured 0.29 result.
+
+## 13. Future Improvements
+
+Replace the fixed keyword planner with a carefully evaluated language-model planner while retaining input validation and human review. Add more songs with balanced genre and mood coverage, incorporate tempo and valence into scoring, and compare recommendations with real listener feedback. Improve confidence calibration against those judgments, add request rate limiting and privacy-conscious log retention, and provide a human-in-the-loop review or feedback button.
