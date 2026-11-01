@@ -60,6 +60,97 @@ You can add more tests in `tests/test_recommender.py`.
 
 ---
 
+### Running the VibeFinder Agent
+
+The agent CLI accepts a natural-language request, prints recommendations and its
+plan/act/verify/revise trace, and writes the trace to `logs/agent_trace.log`.
+
+```bash
+python -m src.agent_cli "I need chill music to study at night"
+```
+
+```text
+Request: I need chill music to study at night
+Strategy used: mood_first | Confidence: 0.51
+| Rank   | Title              | Artist         | Score   |
+|--------|--------------------|----------------|---------|
+| 1      | Midnight Coding    | LoRoom         | 5.00    |
+| 2      | Spacewalk Thoughts | Orbit Bloom    | 4.98    |
+| 3      | Library Rain       | Paper Lanterns | 4.04    |
+| 4      | Night Drive Loop   | Neon Echo      | 1.73    |
+| 5      | Rooftop Lights     | Indigo Parade  | 1.67    |
+
+Agent trace:
+ INPUT guardrail passed: 'I need chill music to study at night'
+ PLAN profile = {'genre': None, 'mood': 'chill', 'energy': 0.3, 'target_popularity': 60, 'preferred_decade': 2020, 'preferred_mood_tags': ['chill'], 'target_instrumentalness': 0.3, 'exclude_explicit': False}
+ ACT attempt 1 mode=genre_first: top='Midnight Coding' confidence=0.31 problems=none
+ REVISE confidence 0.31 too low or problems found -> trying next strategy
+ ACT attempt 2 mode=mood_first: top='Midnight Coding' confidence=0.51 problems=none
+ VERIFY attempt 2 accepted (confidence >= 0.5)
+```
+
+```bash
+python -m src.agent_cli "clean pop party music"
+```
+
+```text
+Request: clean pop party music
+Strategy used: genre_first | Confidence: 0.56
+| Rank   | Title           | Artist            | Score   |
+|--------|-----------------|-------------------|---------|
+| 1      | Gym Hero        | Max Pulse         | 5.04    |
+| 2      | Sunrise City    | Neon Echo         | 4.53    |
+| 3      | Neon Parade     | The Brass Circuit | 2.07    |
+| 4      | Rooftop Lights  | Indigo Parade     | 1.99    |
+| 5      | Midnight Coding | LoRoom            | 1.64    |
+
+Agent trace:
+ INPUT guardrail passed: 'clean pop party music'
+ PLAN profile = {'genre': 'pop', 'mood': None, 'energy': 0.9, 'target_popularity': 60, 'preferred_decade': 2020, 'preferred_mood_tags': [], 'target_instrumentalness': 0.3, 'exclude_explicit': True}
+ GUARD clean-music request: removed 3 explicit songs
+ ACT attempt 1 mode=genre_first: top='Gym Hero' confidence=0.56 problems=none
+ VERIFY attempt 1 accepted (confidence >= 0.5)
+```
+
+```bash
+python -m src.agent_cli "polka"
+```
+
+```text
+Request: polka
+Strategy used: energy_focused | Confidence: 0.29
+| Rank   | Title             | Artist       | Score   |
+|--------|-------------------|--------------|---------|
+| 1      | Midnight Coding   | LoRoom       | 3.88    |
+| 2      | Island Lanterns   | Coral Avenue | 3.67    |
+| 3      | Blue Hour Train   | Ellis Monroe | 3.56    |
+| 4      | Night Drive Loop  | Neon Echo    | 3.43    |
+| 5      | Backroad Postcard | June Wilder  | 3.43    |
+WARNING: No genre or mood recognised; ranking by energy and other features only.
+WARNING: Low confidence (0.29); showing the best of 3 strategies.
+
+Agent trace:
+ INPUT guardrail passed: 'polka'
+ PLAN profile = {'genre': None, 'mood': None, 'energy': 0.5, 'target_popularity': 60, 'preferred_decade': 2020, 'preferred_mood_tags': [], 'target_instrumentalness': 0.3, 'exclude_explicit': False}
+ ACT attempt 1 mode=genre_first: top='Midnight Coding' confidence=0.13 problems=none
+ REVISE confidence 0.13 too low or problems found -> trying next strategy
+ ACT attempt 2 mode=mood_first: top='Midnight Coding' confidence=0.13 problems=none
+ REVISE confidence 0.13 too low or problems found -> trying next strategy
+ ACT attempt 3 mode=energy_focused: top='Midnight Coding' confidence=0.29 problems=none
+ REVISE confidence 0.29 too low or problems found -> trying next strategy
+ VERIFY no attempt passed; using best (mode=energy_focused, confidence=0.29)
+```
+
+An empty request is rejected (the command exits with status 1):
+
+```bash
+python -m src.agent_cli ""
+```
+
+```text
+Guardrail blocked this request: Request is empty. Try: 'chill lofi music to study'.
+```
+
 ## Sample Recommendation Output
 
 ```text

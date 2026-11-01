@@ -1,0 +1,20 @@
+2026-10-31 23:03:18,190 INPUT guardrail passed: 'clean pop party music'
+2026-10-31 23:03:18,190 PLAN profile = {'genre': 'pop', 'mood': None, 'energy': 0.9, 'target_popularity': 60, 'preferred_decade': 2020, 'preferred_mood_tags': [], 'target_instrumentalness': 0.3, 'exclude_explicit': True}
+2026-10-31 23:03:18,190 GUARD clean-music request: removed 3 explicit songs
+2026-10-31 23:03:18,190 ACT attempt 1 mode=genre_first: top='Gym Hero' confidence=0.56 problems=none
+2026-10-31 23:03:18,190 VERIFY attempt 1 accepted (confidence >= 0.5)
+2026-10-31 23:03:18,190 INPUT guardrail passed: 'I need chill music to study at night'
+2026-10-31 23:03:18,190 PLAN profile = {'genre': None, 'mood': 'chill', 'energy': 0.3, 'target_popularity': 60, 'preferred_decade': 2020, 'preferred_mood_tags': ['chill'], 'target_instrumentalness': 0.3, 'exclude_explicit': False}
+2026-10-31 23:03:18,190 ACT attempt 1 mode=genre_first: top='Midnight Coding' confidence=0.31 problems=none
+2026-10-31 23:03:18,190 REVISE confidence 0.31 too low or problems found -> trying next strategy
+2026-10-31 23:03:18,190 ACT attempt 2 mode=mood_first: top='Midnight Coding' confidence=0.51 problems=none
+2026-10-31 23:03:18,190 INPUT guardrail passed: 'polka'
+2026-10-31 23:03:18,190 VERIFY attempt 2 accepted (confidence >= 0.5)
+2026-10-31 23:03:18,190 PLAN profile = {'genre': None, 'mood': None, 'energy': 0.5, 'target_popularity': 60, 'preferred_decade': 2020, 'preferred_mood_tags': [], 'target_instrumentalness': 0.3, 'exclude_explicit': False}
+2026-10-31 23:03:18,190 ACT attempt 1 mode=genre_first: top='Midnight Coding' confidence=0.13 problems=none
+2026-10-31 23:03:18,190 REVISE confidence 0.13 too low or problems found -> trying next strategy
+2026-10-31 23:03:18,191 ACT attempt 2 mode=mood_first: top='Midnight Coding' confidence=0.13 problems=none
+2026-10-31 23:03:18,191 REVISE confidence 0.13 too low or problems found -> trying next strategy
+2026-10-31 23:03:18,191 ACT attempt 3 mode=energy_focused: top='Midnight Coding' confidence=0.29 problems=none
+2026-10-31 23:03:18,191 REVISE confidence 0.29 too low or problems found -> trying next strategy
+2026-10-31 23:03:18,191 VERIFY no attempt passed; using best (mode=energy_focused, confidence=0.29)

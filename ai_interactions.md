@@ -167,3 +167,94 @@ The AI recommended `tabulate` over hand-built ASCII because it formats columns a
 ### Manual Verification Notes
 
 Installed requirements in a temporary virtual environment and ran `python3 -m src.main`. The output contained 17 grid tables: one for each of five profiles across three modes, plus the diversity ON/OFF comparison. Checked that every table includes the five requested columns and that long Reasons values wrap within their cells. The README sample is copied from the actual High-Energy Pop / genre-first output. No implementation issues were found.
+
+---
+
+## Challenge 5: VibeFinder Agent CLI
+
+### Prompt used
+
+> Create `src/agent_cli.py`. It should accept a natural-language request from command-line arguments, load the song catalog, run the agent, print a recommendations table plus warnings and the reasoning trace, and write trace messages to `logs/agent_trace.log`. Catch `GuardrailError` for blocked requests.
+
+### What the AI generated
+
+Added a CLI entry point runnable with `python -m src.agent_cli "<request>"`. It prints the selected strategy, confidence, recommendation table, any warnings, and the agent trace. The logging setup creates `logs/` and appends agent trace messages to `logs/agent_trace.log`.
+
+### Captured output
+
+```text
+$ python -m src.agent_cli "I need chill music to study at night"
+Request: I need chill music to study at night
+Strategy used: mood_first | Confidence: 0.51
+| Rank   | Title              | Artist         | Score   |
+|--------|--------------------|----------------|---------|
+| 1      | Midnight Coding    | LoRoom         | 5.00    |
+| 2      | Spacewalk Thoughts | Orbit Bloom    | 4.98    |
+| 3      | Library Rain       | Paper Lanterns | 4.04    |
+| 4      | Night Drive Loop   | Neon Echo      | 1.73    |
+| 5      | Rooftop Lights     | Indigo Parade  | 1.67    |
+
+Agent trace:
+ INPUT guardrail passed: 'I need chill music to study at night'
+ PLAN profile = {'genre': None, 'mood': 'chill', 'energy': 0.3, 'target_popularity': 60, 'preferred_decade': 2020, 'preferred_mood_tags': ['chill'], 'target_instrumentalness': 0.3, 'exclude_explicit': False}
+ ACT attempt 1 mode=genre_first: top='Midnight Coding' confidence=0.31 problems=none
+ REVISE confidence 0.31 too low or problems found -> trying next strategy
+ ACT attempt 2 mode=mood_first: top='Midnight Coding' confidence=0.51 problems=none
+ VERIFY attempt 2 accepted (confidence >= 0.5)
+```
+
+```text
+$ python -m src.agent_cli "clean pop party music"
+Request: clean pop party music
+Strategy used: genre_first | Confidence: 0.56
+| Rank   | Title           | Artist            | Score   |
+|--------|-----------------|-------------------|---------|
+| 1      | Gym Hero        | Max Pulse         | 5.04    |
+| 2      | Sunrise City    | Neon Echo         | 4.53    |
+| 3      | Neon Parade     | The Brass Circuit | 2.07    |
+| 4      | Rooftop Lights  | Indigo Parade     | 1.99    |
+| 5      | Midnight Coding | LoRoom            | 1.64    |
+
+Agent trace:
+ INPUT guardrail passed: 'clean pop party music'
+ PLAN profile = {'genre': 'pop', 'mood': None, 'energy': 0.9, 'target_popularity': 60, 'preferred_decade': 2020, 'preferred_mood_tags': [], 'target_instrumentalness': 0.3, 'exclude_explicit': True}
+ GUARD clean-music request: removed 3 explicit songs
+ ACT attempt 1 mode=genre_first: top='Gym Hero' confidence=0.56 problems=none
+ VERIFY attempt 1 accepted (confidence >= 0.5)
+```
+
+```text
+$ python -m src.agent_cli "polka"
+Request: polka
+Strategy used: energy_focused | Confidence: 0.29
+| Rank   | Title             | Artist       | Score   |
+|--------|-------------------|--------------|---------|
+| 1      | Midnight Coding   | LoRoom       | 3.88    |
+| 2      | Island Lanterns   | Coral Avenue | 3.67    |
+| 3      | Blue Hour Train   | Ellis Monroe | 3.56    |
+| 4      | Night Drive Loop  | Neon Echo    | 3.43    |
+| 5      | Backroad Postcard | June Wilder  | 3.43    |
+WARNING: No genre or mood recognised; ranking by energy and other features only.
+WARNING: Low confidence (0.29); showing the best of 3 strategies.
+
+Agent trace:
+ INPUT guardrail passed: 'polka'
+ PLAN profile = {'genre': None, 'mood': None, 'energy': 0.5, 'target_popularity': 60, 'preferred_decade': 2020, 'preferred_mood_tags': [], 'target_instrumentalness': 0.3, 'exclude_explicit': False}
+ ACT attempt 1 mode=genre_first: top='Midnight Coding' confidence=0.13 problems=none
+ REVISE confidence 0.13 too low or problems found -> trying next strategy
+ ACT attempt 2 mode=mood_first: top='Midnight Coding' confidence=0.13 problems=none
+ REVISE confidence 0.13 too low or problems found -> trying next strategy
+ ACT attempt 3 mode=energy_focused: top='Midnight Coding' confidence=0.29 problems=none
+ REVISE confidence 0.29 too low or problems found -> trying next strategy
+ VERIFY no attempt passed; using best (mode=energy_focused, confidence=0.29)
+```
+
+```text
+$ python -m src.agent_cli ""
+Guardrail blocked this request: Request is empty. Try: 'chill lofi music to study'.
+Exit status: 1
+```
+
+### Manual verification notes
+
+Ran all four commands against `data/songs.csv`. The chill request revised from `genre_first` to `mood_first` and was accepted at 0.51 confidence. The clean request removed three explicit songs before recommending. The unrecognized `polka` request tried all three strategies and displayed low-confidence warnings. The empty request was blocked and exited with status 1. Confirmed the valid runs were written to `logs/agent_trace.log`; the blocked empty request was rejected before an agent trace could be logged.
